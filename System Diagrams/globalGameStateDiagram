@@ -1,0 +1,29 @@
+This governs screens + mode transitions
+[MainMenu]
+     |
+     | Start Game
+     v
+[GameSetup]
+     |
+     v
+[Gameplay]
+     |
+     | Winner determined
+     v
+[VictoryScreen]
+     |
+     | Play Again
+     v
+[GameSetup]
+     |
+     | Return to Menu
+     v
+[MainMenu]
+
+enum GameMode
+{
+    MainMenu,
+    GameSetup,
+    Gameplay,
+    Victory
+}

@@ -1,0 +1,15 @@
+This is isolated and disposable.
+
+[BattleStart]
+     |
+     v
+[AcceptInputs] (30s global timer)
+     |
+     v
+[ResolveBattle]
+     |
+     v
+[BattleResult]
+     |
+     v
+(Return to PlayerTurn)

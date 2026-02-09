@@ -1,0 +1,27 @@
+Nested inside GameMode.Gameplay.
+
+[PlayerTurnStart]
+       |
+       v
+[AwaitPlayerDecision]  <─────────────+
+   |        |                         |
+   |        |                         |
+Attack   End Turn                 Battle resolves
+   |        |                         |
+   v        v                         |
+[Battle]   [EndTurn]                  |
+   |                                  |
+   v                                  |
+[BattleResult] ── Can continue? ── yes ─┘
+                     |
+                     no
+                     v
+                 [EndTurn]
+
+enum TurnState
+{
+    StartTurn,
+    AwaitAction,
+    InBattle,
+    EndingTurn
+}
