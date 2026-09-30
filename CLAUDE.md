@@ -41,9 +41,13 @@ The user is an experienced programmer who is **new to game development and Unity
 
 - **Unity 6000.3.7f1** (Unity 6.3), Universal 2D (URP) template.
 - **UI:** UGUI + TextMeshPro. **Input:** the new Input System package (`com.unity.inputsystem`) is installed.
-- **Test Framework:** 1.6.0 is installed; no tests or asmdefs exist yet.
+- **Tests:** Unity Test Framework 1.6.0, EditMode tests in `Assets/Tests/EditMode`.
+  - To run them in the Editor: *Window → General → Test Runner → EditMode → Run All*.
+  - To run them through the MCP: call `Unity_RunCommand` with `TestRunnerApi.Execute(... runSynchronously = true)` and write the results to `Temp/`.
 - **Scene:** `Assets/Scenes/WordBattle.unity`.
-- **Scripts:** `Assets/Scripts/{Core,Gameplay,Utils}`.
+- **Scripts:**
+  - `Assets/Scripts/Core`: the `WordBattle.Core` assembly. Pure C# with no engine references allowed.
+  - `Assets/Scripts/Game`: the `WordBattle.Game` assembly. MonoBehaviours.
 - **Dictionary:** `Assets/Data/WordBattleDictionary.txt` — lowercase, one word per line, LF line endings, 172,823 words. The source is **ENABLE1** (public domain).
 - **Version control:** Git + GitHub (`Tedgar20/...`). Feature branches are named `feature/<Name>`, with PRs into `main`. Commit `.meta` files together with their assets. Never commit `Library/`, `Temp/`, `Logs/`, or `UserSettings/`.
 - **Unity MCP (`unity-mcp`):**
@@ -60,4 +64,6 @@ The user is an experienced programmer who is **new to game development and Unity
 - **Validation:** validate required Inspector references in `Awake` and log a clear error.
 - **Events:** managers communicate through C# events/`Action`s or direct calls from the layer above. Lower layers never reach up (Battle doesn't know about Turns; Turns don't know about screens).
 - **Words:** uppercase words internally. Letters are A–Z only.
-- **Style:** match the existing code (Allman braces, `PascalCase` methods, `camelCase` fields). Namespaces/asmdefs are proposed in `Docs/decisions.md`, not adopted yet.
+- **Namespaces:** `WordBattle.Core`, `WordBattle.Game`, `WordBattle.Tests`.
+- **Style:** match the existing code (Allman braces, `PascalCase` methods, `camelCase` fields).
+- **New Core logic** gets EditMode tests in the same change.

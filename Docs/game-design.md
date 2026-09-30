@@ -61,7 +61,7 @@ Ask the user before building anything that depends on one of these. Each lists a
 | # | Question | Recommended default |
 |---|---|---|
 | Q1 | Must the word use only rack letters, each at most as often as it appears? | Yes, Scrabble-style multiset check |
-| Q2 | Does an invalid word, or no submission, score 0 or lose automatically? | Scores 0. If both score 0, the tie-break applies |
+| Q2 | Does an invalid word, or no submission, score 0 or lose automatically? | ✅ **Implemented default: it scores 0, and a 0–0 tie goes to the defender** (D17). The user can still override this |
 | Q3 | Tie-break rule? | ✅ **Decided: fastest submission wins.** If neither player submitted, **the defender wins**, since the attacker chose to fight. In the MVP the AI is the defender |
 | Q4 | Is there a bonus for using all 8 tiles (anagram)? | ✅ **Decided: no bonus.** Gold is only a visual highlight |
 | Q5 | Minimum word length? | 2, matching the dictionary |

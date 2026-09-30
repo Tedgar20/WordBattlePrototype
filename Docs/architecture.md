@@ -45,39 +45,52 @@ enum TurnState  { StartTurn, AwaitAction, InBattle, EndingTurn }
 
 ## Current state of the code (as of branch `feature/TurnSystem-GameState`)
 
+**Assemblies:**
+
+| Assembly | Folder | Contents |
+|---|---|---|
+| `WordBattle.Core` | `Assets/Scripts/Core/` | Pure C# rules, namespace `WordBattle.Core`. `noEngineReferences: true`, so the compiler **forbids** `UnityEngine` here. |
+| `WordBattle.Game` | `Assets/Scripts/Game/` | MonoBehaviour adapters, namespace `WordBattle.Game`. References Core, UGUI, and TMP. |
+| `WordBattle.Tests.EditMode` | `Assets/Tests/EditMode/` | NUnit EditMode tests for Core, using a small in-memory word list (`TestWords`). |
+
+**Core (done and tested):**
+
+| Type | Role |
+|---|---|
+| `LetterScoreTable`, `WordScorer` | Letter values and word score. Culture-invariant. |
+| `WordDictionary` | Normalized A–Z word set, capped at `MaxWordLength` (8), with a words-by-length index. `FromText` parses a TextAsset. The real ENABLE1 file loads in about 45 ms: 80,368 words, including 28,420 eight-letter words. |
+| `Rack` | Immutable tiles. `CanForm(word)` is a multiset check (each tile used at most once). |
+| `RackGenerator` | Shuffles a random 8-letter seed word using an injected `System.Random`. |
+| `WordValidator` / `WordStatus` | Returns `Empty`, `NotInRack`, `NotAWord`, `Valid`, or `Anagram` (uses all tiles). This drives the red/green/gold colouring. |
+| `Battle` | Shared rack and timer, driven by `Tick(dt)`.<br>`Submit(role, word)` locks in once; any word is accepted and invalid words score 0.<br>The `Submitted` event carries only the role, so words stay hidden until `Resolved`, which fires once.<br>Resolves when both players have submitted or time expires. |
+| `BattleResult`, `Submission`, `BattleRole`, `WinReason` | Result data. `WinReason` is `HigherScore`, `FasterSubmission`, or `DefenderByDefault`. |
+| `Match`, `MatchConfig` | Best-of-N over battles (`RoundsToWin`: 2 for the MVP, 1 in production). `StartNextRound()` is called explicitly by the caller. Raises `RoundStarted`, `RoundEnded`, and `MatchEnded`. |
+
+**Game (Unity adapters):**
+
 | File | Status |
 |---|---|
-| `Scripts/Core/LetterScoreTable.cs` | ✅ Static class; `GetLetterScore(char)` is culture-invariant, and unknown characters score 0. |
-| `Scripts/Gameplay/WordScorer.cs` | ✅ Static class; `CalculateScore(string)` sums letter scores and skips non-letters. It is the single source of scoring. |
-| `Scripts/Core/DictionaryManager.cs` | ✅ Singleton MonoBehaviour (`DontDestroyOnLoad`). Loads a `TextAsset` into an ordinal `HashSet`, keeps only words up to `maxWordLength` (8), null-checks the file, and has a null-safe `IsValidWord`. |
-| `Scripts/Core/GameStateManager.cs` | ⚠️ **Prototype using the wrong model:** alternating turns with a per-player timer. Now hardened (Inspector ref checks, uses `WordScorer`), but it should be replaced by the layered design above. |
-| `Scripts/Utils/DebugTest.cs` | 🧪 Scratch test for the QUIZ score; delete once real tests exist. |
+| `DictionaryManager.cs` | ✅ Singleton that loads the TextAsset into a `WordDictionary`, exposed as `Dictionary`. |
+| `GameStateManager.cs` | ⚠️ **Prototype with the wrong model** (alternating turns). Replace it with a `BattleManager` that drives `Match`, and delete it. |
 
 ### Known issues and tech debt
 
 1. **The scene is empty.** `Assets/Scenes/WordBattle.unity` is still the untouched URP template (Main Camera + Global Light 2D).
    - The TMP UI and the `GameStateManager`/`DictionaryManager` objects described in earlier notes were **never saved**.
-   - `Assets/_Recovery/0.unity`, a crash-recovery scene, holds only a DictionaryManager + DebugTest object.
+   - `Assets/_Recovery/0.unity` is an untracked crash-recovery scene with nothing worth keeping. It now also references the deleted `DebugTest` script. The user should delete it.
    - The UI must be rebuilt, ideally against the new Battle architecture rather than the prototype.
 2. **The project uses the new Input System only** (`activeInputHandler: 1`).
    - Any EventSystem must use `InputSystemUIInputModule`, not `StandaloneInputModule`, which would throw errors.
    - Don't use `UnityEngine.Input` in scripts.
-3. **No rack check:** nothing verifies that a word is buildable from the tiles.
-4. **Singleton access in `Start`:** `DictionaryManager.Instance` is used from other scripts' `Start`, which works only because the loading happens in `Awake`. Keep that invariant or use explicit initialization.
-5. **Words longer than 8 letters are filtered at load time.** 92k extra words are still read on every launch; the editor build step from the roadmap would remove that cost.
-6. **No tests:** there are no asmdefs, which EditMode tests require.
-7. **Pre-release package:** `com.unity.ai.assistant` is pre-release (`2.20.0-pre.1`). It's an editor tool only, so it doesn't affect builds.
+3. **Singleton access in `Start`:** `DictionaryManager.Instance` is used from other scripts' `Start`, which works only because the loading happens in `Awake`. Keep that invariant or use explicit initialization.
+4. **Words longer than 8 letters are filtered at load time.** About 92k extra lines are parsed on every launch (about 45 ms total in the Editor). Check on mobile before adding an editor build step.
+5. **Pre-release package:** `com.unity.ai.assistant` is pre-release (`2.20.0-pre.1`). It's an editor tool only, so it doesn't affect builds.
 
-## Target class sketch (MVP)
+## Still to build (MVP)
 
 ```
-GameModeManager : MonoBehaviour      // screen switching, Play Again / Menu
-MatchController                      // plain C#: best-of-N over battles, match winner
-Battle                               // plain C#: state, timer, submissions, Resolve() → BattleResult
-BattleManager : MonoBehaviour        // adapter: ticks Battle, bridges to UI & players
-IPlayerController                    // HumanPlayerController (UI), AiPlayerController (solver + think delay)
-Rack / RackGenerator                 // 8 tiles from a random 8-letter word, shuffled
-WordValidator                        // dictionary membership + rack multiset check
-WordScorer, LetterScoreTable         // existing
-WordDictionary                       // plain C# data: HashSet + anagram index; DictionaryManager loads it
+BattleManager : MonoBehaviour   // adapter: owns a Match, ticks it from Update, bridges to UI & player controllers
+IPlayerController               // HumanPlayerController (UI input), AiPlayerController (solver + think delay)
+GameModeManager : MonoBehaviour // screens: MainMenu → GameSetup → Gameplay → Victory
+Solver / AI word choice         // all dictionary words formable from a rack, ranked by score (word-engine)
 ```
