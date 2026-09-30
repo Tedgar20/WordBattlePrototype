@@ -47,21 +47,26 @@ enum TurnState  { StartTurn, AwaitAction, InBattle, EndingTurn }
 
 | File | Status |
 |---|---|
-| `Scripts/Core/LetterScoreTable.cs` | ✅ Static score table plus `GetLetterScore(char)`; unknown characters → 0. Fine. |
-| `Scripts/Gameplay/WordScorer.cs` | ✅ `CalculateScore(string)` sums letter scores and skips non-letters. |
-| `Scripts/Core/DictionaryManager.cs` | ⚠️ A singleton MonoBehaviour (`DontDestroyOnLoad`) that loads a `TextAsset` into a `HashSet`, with `IsValidWord`. It doesn't null-check `dictionaryFile`, and it doesn't filter out words longer than 8 letters. |
-| `Scripts/Core/GameStateManaer.cs` | ⚠️ An **early prototype** using the wrong model: alternating turns with a per-player timer. It should be replaced by the layered design above. |
-| `Scripts/Utils/DebugTest.cs` | 🧪 Scratch test for the QUIZ score; can be deleted once real tests exist. |
+| `Scripts/Core/LetterScoreTable.cs` | ✅ Static class; `GetLetterScore(char)` is culture-invariant, and unknown characters score 0. |
+| `Scripts/Gameplay/WordScorer.cs` | ✅ Static class; `CalculateScore(string)` sums letter scores and skips non-letters. It is the single source of scoring. |
+| `Scripts/Core/DictionaryManager.cs` | ✅ Singleton MonoBehaviour (`DontDestroyOnLoad`). Loads a `TextAsset` into an ordinal `HashSet`, keeps only words up to `maxWordLength` (8), null-checks the file, and has a null-safe `IsValidWord`. |
+| `Scripts/Core/GameStateManager.cs` | ⚠️ **Prototype using the wrong model:** alternating turns with a per-player timer. Now hardened (Inspector ref checks, uses `WordScorer`), but it should be replaced by the layered design above. |
+| `Scripts/Utils/DebugTest.cs` | 🧪 Scratch test for the QUIZ score; delete once real tests exist. |
 
 ### Known issues and tech debt
 
-1. **`GameStateManaer.cs` filename typo.** The class is `GameStateManager`. Unity requires the file name to match a MonoBehaviour's class name, or the component can't be added or loaded. Rename the file together with its `.meta`. Doing it in the Editor, or with `git mv` for both files, preserves the GUID.
-2. **Duplicate scoring logic:** `GameStateManager.CalculateWordScore` duplicates `WordScorer`.
+1. **The scene is empty.** `Assets/Scenes/WordBattle.unity` is still the untouched URP template (Main Camera + Global Light 2D).
+   - The TMP UI and the `GameStateManager`/`DictionaryManager` objects described in earlier notes were **never saved**.
+   - `Assets/_Recovery/0.unity`, a crash-recovery scene, holds only a DictionaryManager + DebugTest object.
+   - The UI must be rebuilt, ideally against the new Battle architecture rather than the prototype.
+2. **The project uses the new Input System only** (`activeInputHandler: 1`).
+   - Any EventSystem must use `InputSystemUIInputModule`, not `StandaloneInputModule`, which would throw errors.
+   - Don't use `UnityEngine.Input` in scripts.
 3. **No rack check:** nothing verifies that a word is buildable from the tiles.
 4. **Singleton access in `Start`:** `DictionaryManager.Instance` is used from other scripts' `Start`, which works only because the loading happens in `Awake`. Keep that invariant or use explicit initialization.
-5. **Dictionary not filtered:** the dictionary contains words longer than 8 letters. Filter them at load time or with an editor build step.
-6. **Stray scene:** `Assets/_Recovery/0.unity` is a crash-recovery scene and is probably safe to delete. Confirm with the user first.
-7. **No tests:** there are no asmdefs, which EditMode tests require.
+5. **Words longer than 8 letters are filtered at load time.** 92k extra words are still read on every launch; the editor build step from the roadmap would remove that cost.
+6. **No tests:** there are no asmdefs, which EditMode tests require.
+7. **Pre-release package:** `com.unity.ai.assistant` is pre-release (`2.20.0-pre.1`). It's an editor tool only, so it doesn't affect builds.
 
 ## Target class sketch (MVP)
 

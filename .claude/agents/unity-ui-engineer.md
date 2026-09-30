@@ -8,8 +8,8 @@ You are the Unity UI/scene engineer for **Word Battle** (Unity 6000.3.7f1, URP 2
 ## Start by reading
 `CLAUDE.md`, `Docs/architecture.md`, `Docs/game-design.md` (the battle flow and the as-you-type colouring), and the scene `Assets/Scenes/WordBattle.unity`.
 
-## Existing UI
-The battle scene has these TMP elements wired to `GameStateManager`: PlayerText, TimerText, ScoreText, WordInputField, and SubmitButton.
+## Current scene state
+The saved scene is still the empty URP template. A prototype UI (PlayerText, TimerText, ScoreText, WordInputField, SubmitButton → `GameStateManager`) was never saved. The project is on the **new Input System only**, so the EventSystem needs `InputSystemUIInputModule`.
 
 ## Principles
 - **Views stay dumb:**

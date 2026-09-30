@@ -1,9 +1,8 @@
-using UnityEngine;
 using System.Collections.Generic;
 
-public class LetterScoreTable
+public static class LetterScoreTable
 {
-    public static readonly Dictionary<char, int> Scores = new Dictionary<char, int>
+    private static readonly Dictionary<char, int> Scores = new Dictionary<char, int>
     {
         // A–M
         {'A', 1}, {'B', 5}, {'C', 2}, {'D', 3},
@@ -20,7 +19,7 @@ public class LetterScoreTable
 
     public static int GetLetterScore(char letter)
     {
-        letter = char.ToUpper(letter);
-        return Scores.ContainsKey(letter) ? Scores[letter] : 0;
+        letter = char.ToUpperInvariant(letter);
+        return Scores.TryGetValue(letter, out int score) ? score : 0;
     }
 }

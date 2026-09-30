@@ -1,13 +1,12 @@
-using UnityEngine;
-
-public class WordScorer
+public static class WordScorer
 {
     public static int CalculateScore(string word)
     {
-        if (string.IsNullOrWhiteSpace(word)){
+        if (string.IsNullOrWhiteSpace(word))
+        {
             return 0;
         }
-        
+
         int score = 0;
 
         foreach (char c in word)

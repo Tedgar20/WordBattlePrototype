@@ -5,15 +5,15 @@ using TMPro; // For TextMeshPro
 public class GameStateManager : MonoBehaviour
 {
     [Header("UI References")]
-    public TMP_Text playerText;      
-    public TMP_Text timerText;       
-    public TMP_Text scoreText;       
-    public TMP_InputField wordInputField; 
-    public Button submitButton;      
+    [SerializeField] private TMP_Text playerText;
+    [SerializeField] private TMP_Text timerText;
+    [SerializeField] private TMP_Text scoreText;
+    [SerializeField] private TMP_InputField wordInputField;
+    [SerializeField] private Button submitButton;
 
     [Header("Game Settings")]
-    public int totalPlayers = 2;     
-    public float turnTime = 30f;     
+    [SerializeField] private int totalPlayers = 2;
+    [SerializeField] private float turnTime = 30f;
 
     private int currentPlayerIndex = 0; 
     private float turnTimer;
@@ -23,6 +23,13 @@ public class GameStateManager : MonoBehaviour
     private void Awake()
     {
         playerScores = new int[totalPlayers];
+
+        if (playerText == null || timerText == null || scoreText == null ||
+            wordInputField == null || submitButton == null)
+        {
+            Debug.LogError("GameStateManager: one or more UI references are not assigned in the Inspector.", this);
+            enabled = false;
+        }
     }
 
     private void Start()
@@ -31,6 +38,14 @@ public class GameStateManager : MonoBehaviour
 
         StartTurn();
         UpdateScoreUI();
+    }
+
+    private void OnDestroy()
+    {
+        if (submitButton != null)
+        {
+            submitButton.onClick.RemoveListener(OnSubmitButtonPressed);
+        }
     }
 
     private void Update()
@@ -75,35 +90,29 @@ public class GameStateManager : MonoBehaviour
     // --- Word Submission ---
     private void OnSubmitButtonPressed()
     {
-        string word = wordInputField.text.Trim().ToUpper();
+        string word = wordInputField.text.Trim().ToUpperInvariant();
 
         if (string.IsNullOrEmpty(word))
             return;
 
-        // Validate word (requires your DictionaryManager)
+        if (DictionaryManager.Instance == null)
+        {
+            Debug.LogError("GameStateManager: no DictionaryManager in the scene.");
+            return;
+        }
+
         if (!DictionaryManager.Instance.IsValidWord(word))
         {
             Debug.Log("Invalid word!");
             return;
         }
 
-        // Calculate word score using LetterScoreTable
-        int score = CalculateWordScore(word);
+        int score = WordScorer.CalculateScore(word);
         playerScores[currentPlayerIndex] += score;
 
         Debug.Log($"Player {currentPlayerIndex + 1} scored {score} points!");
 
         EndTurn();
-    }
-
-    private int CalculateWordScore(string word)
-    {
-        int score = 0;
-        foreach (char c in word)
-        {
-            score += LetterScoreTable.GetLetterScore(c);
-        }
-        return score;
     }
 
     // --- UI Updates ---

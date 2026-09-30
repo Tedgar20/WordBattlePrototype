@@ -9,7 +9,7 @@ Status key: ✅ done · 🟡 in progress · ⬜ not started
 | 1 | Project setup and GitHub | ✅ | Unity 6.3 URP 2D, `.gitignore`, repo on GitHub |
 | 2 | Scoring and dictionary | ✅ | `LetterScoreTable`, `WordScorer`, `DictionaryManager` (see known issues) |
 | 3 | Game state and turn management | 🟡 | Prototype `GameStateManager` exists but uses the wrong model. Next: class diagram → GameModeManager → refactor state → Battle |
-| 4 | Basic UI | 🟡 | TMP UI exists: PlayerText, TimerText, ScoreText, WordInputField, SubmitButton |
+| 4 | Basic UI | ⬜ | A TMP UI was prototyped but **never saved to the scene**; rebuild it against the Battle architecture |
 | 5 | Letter rack and tile system | ⬜ | Same 8 tiles for both players, seeded from 8-letter words |
 | 6 | Simple AI opponent | ⬜ | Solver + difficulty knob + think delay |
 | 7 | Best-of-3 rounds and 30s timer | ⬜ | Shared global battle timer, submission locking |
@@ -18,10 +18,7 @@ Status key: ✅ done · 🟡 in progress · ⬜ not started
 
 ## Recommended next steps (in order)
 
-1. Fix quick wins:
-   - rename `GameStateManaer.cs`
-   - null-check the dictionary
-   - route all scoring through `WordScorer`
+1. ✅ Quick wins: file rename, dictionary null check, all scoring through `WordScorer`, culture-invariant casing, ≤8-letter filter at load
 2. Add asmdefs and an EditMode test project, with tests for `WordScorer` (QUIZ = 31) and dictionary validity.
 3. Build `Rack`/`RackGenerator` and `WordValidator` (rack multiset check), with tests.
 4. Build `Battle` (pure C#) and `BattleManager` (adapter): shared timer, lock-in, simultaneous reveal, resolve, tie-break.
