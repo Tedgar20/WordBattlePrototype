@@ -45,51 +45,60 @@ enum TurnState  { StartTurn, AwaitAction, InBattle, EndingTurn }
 
 ## Current state of the code (as of branch `feature/TurnSystem-GameState`)
 
+The MVP loop is **playable end to end**: Main Menu → 3-round match against the AI → Victory → Play Again / Main Menu.
+
 **Assemblies:**
 
 | Assembly | Folder | Contents |
 |---|---|---|
 | `WordBattle.Core` | `Assets/Scripts/Core/` | Pure C# rules, namespace `WordBattle.Core`. `noEngineReferences: true`, so the compiler **forbids** `UnityEngine` here. |
-| `WordBattle.Game` | `Assets/Scripts/Game/` | MonoBehaviour adapters, namespace `WordBattle.Game`. References Core, UGUI, and TMP. |
+| `WordBattle.Game` | `Assets/Scripts/Game/` (+ `UI/`) | MonoBehaviour adapters and views, namespaces `WordBattle.Game` and `WordBattle.Game.UI`. |
+| `WordBattle.Editor` | `Assets/Editor/` | Editor-only tooling: `BattleSceneBuilder`. |
 | `WordBattle.Tests.EditMode` | `Assets/Tests/EditMode/` | NUnit EditMode tests for Core, using a small in-memory word list (`TestWords`). |
 
-**Core (done and tested):**
+**Core (tested):**
 
 | Type | Role |
 |---|---|
 | `LetterScoreTable`, `WordScorer` | Letter values and word score. Culture-invariant. |
-| `WordDictionary` | Normalized A–Z word set, capped at `MaxWordLength` (8), with a words-by-length index. `FromText` parses a TextAsset. The real ENABLE1 file loads in about 45 ms: 80,368 words, including 28,420 eight-letter words. |
-| `Rack` | Immutable tiles. `CanForm(word)` is a multiset check (each tile used at most once). |
-| `RackGenerator` | Shuffles a random 8-letter seed word using an injected `System.Random`. |
-| `WordValidator` / `WordStatus` | Returns `Empty`, `NotInRack`, `NotAWord`, `Valid`, or `Anagram` (uses all tiles). This drives the red/green/gold colouring. |
-| `Battle` | Shared rack and timer, driven by `Tick(dt)`.<br>`Submit(role, word)` locks in once; any word is accepted and invalid words score 0.<br>The `Submitted` event carries only the role, so words stay hidden until `Resolved`, which fires once.<br>Resolves when both players have submitted or time expires. |
-| `BattleResult`, `Submission`, `BattleRole`, `WinReason` | Result data. `WinReason` is `HigherScore`, `FasterSubmission`, or `DefenderByDefault`. |
-| `Match`, `MatchConfig` | Best-of-N over battles (`RoundsToWin`: 2 for the MVP, 1 in production). `StartNextRound()` is called explicitly by the caller. Raises `RoundStarted`, `RoundEnded`, and `MatchEnded`. |
+| `WordDictionary` | Normalized A–Z word set, capped at `MaxWordLength` (8), with a words-by-length index. The real ENABLE1 file loads in about 45 ms: 80,368 words, including 28,420 eight-letter words. |
+| `Rack`, `RackGenerator` | Immutable tiles with a multiset `CanForm`. The generator shuffles a random 8-letter seed word using an injected `System.Random`. |
+| `WordValidator`, `WordStatus` | Returns `Empty`, `NotInRack`, `NotAWord`, `Valid`, or `Anagram`. This drives the red/green/gold colouring. |
+| `WordSolver` | Every formable word for a rack, best first. Used by the AI and the "best possible" reveal. A real rack has about 100–200 words. |
+| `Battle` | Shared rack and timer, driven by `Tick(dt)`.<br>`Submit(role, word)` returns a `SubmitResult`. **Invalid words are rejected without locking in.**<br>Each role locks in once.<br>`Submitted` carries only the role, so the word stays hidden. `Resolved` fires once.<br>Resolves when both players have submitted or time expires. |
+| `BattleResult`, `Submission`, `BattleRole`, `WinReason`, `SubmitResult` | Result data. |
+| `Match`, `MatchConfig` | Best-of-N (`RoundsToWin`). `Winner` is set *before* `RoundEnded` fires. |
+| `IPlayerController` | The multiplayer seam. Implemented by:<br>• `HumanPlayerController`: words come from the UI.<br>• `AiPlayerController`: solves the rack and picks a word by skill percentile from an `AiProfile` (Name, Skill, SkillVariance, think-time range), then submits after its think time. |
 
-**Game (Unity adapters):**
+**Game (Unity layer):**
 
-| File | Status |
+| Type | Role |
 |---|---|
-| `DictionaryManager.cs` | ✅ Singleton that loads the TextAsset into a `WordDictionary`, exposed as `Dictionary`. |
-| `GameStateManager.cs` | ⚠️ **Prototype with the wrong model** (alternating turns). Replace it with a `BattleManager` that drives `Match`, and delete it. |
+| `DictionaryManager` | Singleton that loads the TextAsset into a `WordDictionary`. |
+| `BattleManager` | Owns a `Match` and both controllers.<br>Ticks the match from `Update`.<br>Re-raises `RoundStarted`, `PlayerLockedIn`, and `RoundEnded`.<br>`Continue()` starts the next round, or raises `MatchFinished` after the final results. |
+| `GameModeManager`, `GameMode` | Toggles the MainMenu, Gameplay, and Victory screens. GameSetup is instant in the MVP. |
+| `UI/MainMenuView`, `UI/BattleView`, `UI/VictoryView` | Views that render state on `OnEnable` and react to events. They contain no rules. |
+
+**Scene:** `Assets/Scenes/WordBattle.unity` is **generated** by *Word Battle → Rebuild Battle Scene* (`BattleSceneBuilder`). It contains:
+- `[Systems]`: the managers.
+- `[UI] Canvas`: 1920×1080 reference resolution, Scale With Screen Size.
+- `EventSystem`: uses `InputSystemUIInputModule`.
+
+To change the layout, edit the builder and re-run it, rather than hand-editing the generated objects; a rebuild replaces them.
 
 ### Known issues and tech debt
 
-1. **The scene is empty.** `Assets/Scenes/WordBattle.unity` is still the untouched URP template (Main Camera + Global Light 2D).
-   - The TMP UI and the `GameStateManager`/`DictionaryManager` objects described in earlier notes were **never saved**.
-   - The UI must be rebuilt, ideally against the new Battle architecture rather than the prototype.
-2. **The project uses the new Input System only** (`activeInputHandler: 1`).
-   - Any EventSystem must use `InputSystemUIInputModule`, not `StandaloneInputModule`, which would throw errors.
-   - Don't use `UnityEngine.Input` in scripts.
-3. **Singleton access in `Start`:** `DictionaryManager.Instance` is used from other scripts' `Start`, which works only because the loading happens in `Awake`. Keep that invariant or use explicit initialization.
-4. **Words longer than 8 letters are filtered at load time.** About 92k extra lines are parsed on every launch (about 45 ms total in the Editor). Check on mobile before adding an editor build step.
-5. **Pre-release package:** `com.unity.ai.assistant` is pre-release (`2.20.0-pre.1`). It's an editor tool only, so it doesn't affect builds.
+1. **The project uses the new Input System only** (`activeInputHandler: 1`). Any EventSystem must use `InputSystemUIInputModule`, and scripts must not use `UnityEngine.Input`.
+2. **Singleton access:** `DictionaryManager.Instance` is read when a match starts. This relies on the dictionary loading in `Awake`.
+3. **Words longer than 8 letters are filtered at load time** (about 45 ms in the Editor). Check on mobile before adding an editor build step.
+4. **The rack UI has a fixed 8 tiles,** built by the scene builder. `BattleView` logs an error if `RackSize` is larger.
+5. **Default font:** TMP's Liberation Sans lacks symbols like ✓ ★ ✗, so UI copy uses plain text. Add a font with those glyphs if icons are wanted.
+6. **Pre-release package:** `com.unity.ai.assistant` is pre-release (`2.20.0-pre.1`). It's an editor tool only.
+7. **Editor testing caveat:** an unfocused Unity Editor doesn't advance Play mode frames. MCP-driven play tests advance `Battle.Tick` manually; real-time feel must be checked by a person.
 
-## Still to build (MVP)
+## Still to build
 
-```
-BattleManager : MonoBehaviour   // adapter: owns a Match, ticks it from Update, bridges to UI & player controllers
-IPlayerController               // HumanPlayerController (UI input), AiPlayerController (solver + think delay)
-GameModeManager : MonoBehaviour // screens: MainMenu → GameSetup → Gameplay → Victory
-Solver / AI word choice         // all dictionary words formable from a rack, ranked by score (word-engine)
-```
+- Clickable tiles, shuffle button, sounds, and animations: polish.
+- Opponent selection and difficulty at GameSetup, with original named AI characters.
+- PlayMode tests for UI flow.
+- Full game: territory, `PlayerTurnManager` and the turn timer, and 2–4 players.

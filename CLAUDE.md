@@ -44,10 +44,13 @@ The user is an experienced programmer who is **new to game development and Unity
 - **Tests:** Unity Test Framework 1.6.0, EditMode tests in `Assets/Tests/EditMode`.
   - To run them in the Editor: *Window → General → Test Runner → EditMode → Run All*.
   - To run them through the MCP: call `Unity_RunCommand` with `TestRunnerApi.Execute(... runSynchronously = true)` and write the results to `Temp/`.
-- **Scene:** `Assets/Scenes/WordBattle.unity`.
+- **Scene:** `Assets/Scenes/WordBattle.unity` is **generated** by *Word Battle → Rebuild Battle Scene* (`Assets/Editor/BattleSceneBuilder.cs`).
+  - Change the UI by editing the builder and re-running it.
+  - Through the MCP, call `WordBattle.Editor.BattleSceneBuilder.Build()`.
 - **Scripts:**
   - `Assets/Scripts/Core`: the `WordBattle.Core` assembly. Pure C# with no engine references allowed.
-  - `Assets/Scripts/Game`: the `WordBattle.Game` assembly. MonoBehaviours.
+  - `Assets/Scripts/Game`: the `WordBattle.Game` assembly. MonoBehaviours and `UI/` views.
+  - `Assets/Editor`: the `WordBattle.Editor` assembly.
 - **Dictionary:** `Assets/Data/WordBattleDictionary.txt` — lowercase, one word per line, LF line endings, 172,823 words. The source is **ENABLE1** (public domain).
 - **Version control:** Git + GitHub (`Tedgar20/...`). Feature branches are named `feature/<Name>`, with PRs into `main`. Commit `.meta` files together with their assets. Never commit `Library/`, `Temp/`, `Logs/`, or `UserSettings/`.
 - **Unity MCP (`unity-mcp`):**
@@ -55,6 +58,9 @@ The user is an experienced programmer who is **new to game development and Unity
   - `Unity_RunCommand` runs editor C#.
   - `Unity_SceneView_*` / `Unity_Camera_Capture` take screenshots.
   - The `NoSubscription` info logs come from the Unity AI package and are harmless.
+  - An unfocused Editor doesn't advance Play mode frames, so drive `Battle.Tick` manually in MCP play tests.
+  - The Unity AI assistant blocks `File.Delete` in `RunCommand`.
+  - The relay can drop after inactivity. If calls hang, ask the user to reconnect with `/mcp`.
 
 ## Code conventions
 

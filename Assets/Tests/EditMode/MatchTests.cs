@@ -68,6 +68,18 @@ namespace WordBattle.Tests
         }
 
         [Test]
+        public void RoundEnded_ForFinalRound_AlreadyReportsMatchOver()
+        {
+            Match match = CreateMatch(1);
+            bool? isOverDuringRoundEnded = null;
+            match.RoundEnded += _ => isOverDuringRoundEnded = match.IsOver;
+
+            PlayRound(match, BattleRole.Attacker);
+
+            Assert.IsTrue(isOverDuringRoundEnded);
+        }
+
+        [Test]
         public void BestOfOne_EndsAfterSingleBattle()
         {
             Match match = CreateMatch(1);

@@ -57,8 +57,8 @@ namespace WordBattle.Tests
         [Test]
         public void SecondSubmissionIsRejected()
         {
-            Assert.IsTrue(battle.Submit(BattleRole.Attacker, "RAIN"));
-            Assert.IsFalse(battle.Submit(BattleRole.Attacker, "STRAINED"));
+            Assert.AreEqual(SubmitResult.Accepted, battle.Submit(BattleRole.Attacker, "RAIN"));
+            Assert.AreEqual(SubmitResult.AlreadySubmitted, battle.Submit(BattleRole.Attacker, "STRAINED"));
 
             battle.Submit(BattleRole.Defender, "AN");
             Assert.AreEqual("RAIN", battle.Result.Attacker.Word);
@@ -69,18 +69,40 @@ namespace WordBattle.Tests
         {
             battle.Tick(30f);
 
-            Assert.IsFalse(battle.Submit(BattleRole.Attacker, "RAIN"));
+            Assert.AreEqual(SubmitResult.BattleOver, battle.Submit(BattleRole.Attacker, "RAIN"));
+        }
+
+        [TestCase("QUIZ")]   // not in rack
+        [TestCase("SNARE")]  // not a word
+        [TestCase("")]
+        public void InvalidWord_IsRejectedAndNotLockedIn(string word)
+        {
+            Assert.AreEqual(SubmitResult.InvalidWord, battle.Submit(BattleRole.Attacker, word));
+            Assert.IsFalse(battle.HasSubmitted(BattleRole.Attacker));
+
+            // The player can keep trying after a rejected word.
+            Assert.AreEqual(SubmitResult.Accepted, battle.Submit(BattleRole.Attacker, "RAIN"));
         }
 
         [Test]
-        public void InvalidWord_ScoresZero()
+        public void InvalidWord_DoesNotRaiseSubmitted()
         {
-            battle.Submit(BattleRole.Attacker, "QUIZ");  // not in rack
-            battle.Submit(BattleRole.Defender, "SNARE"); // not a word
+            int submittedCount = 0;
+            battle.Submitted += _ => submittedCount++;
 
-            Assert.AreEqual(0, battle.Result.GetScore(BattleRole.Attacker));
-            Assert.AreEqual(WordStatus.NotInRack, battle.Result.Attacker.Status);
-            Assert.AreEqual(WordStatus.NotAWord, battle.Result.Defender.Status);
+            battle.Submit(BattleRole.Attacker, "QUIZ");
+
+            Assert.AreEqual(0, submittedCount);
+        }
+
+        [Test]
+        public void AnagramSubmission_RecordsAnagramStatus()
+        {
+            battle.Submit(BattleRole.Attacker, "DETRAINS");
+            battle.Submit(BattleRole.Defender, "RAIN");
+
+            Assert.AreEqual(WordStatus.Anagram, battle.Result.Attacker.Status);
+            Assert.AreEqual(WordStatus.Valid, battle.Result.Defender.Status);
         }
 
         [Test]
@@ -127,14 +149,34 @@ namespace WordBattle.Tests
         }
 
         [Test]
-        public void BothInvalid_DefenderWinsEvenIfAttackerWasFaster()
+        public void OnlyInvalidAttempts_DefenderWinsAtTimeout()
         {
             battle.Submit(BattleRole.Attacker, "QUIZ");
             battle.Tick(5f);
             battle.Submit(BattleRole.Defender, "SNARE");
+            battle.Tick(25f);
 
+            Assert.IsNull(battle.Result.Attacker);
+            Assert.IsNull(battle.Result.Defender);
             Assert.AreEqual(BattleRole.Defender, battle.Result.Winner);
             Assert.AreEqual(WinReason.DefenderByDefault, battle.Result.Reason);
+        }
+
+        [Test]
+        public void OnlyOnePlayerSubmits_TheyWinAtTimeout()
+        {
+            battle.Submit(BattleRole.Defender, "AN");
+            battle.Tick(30f);
+
+            Assert.AreEqual(BattleRole.Defender, battle.Result.Winner);
+            Assert.AreEqual(WinReason.HigherScore, battle.Result.Reason);
+        }
+
+        [TestCase("rain", WordStatus.Valid)]
+        [TestCase("QUIZ", WordStatus.NotInRack)]
+        public void Validate_UsesBattleRack(string word, WordStatus expected)
+        {
+            Assert.AreEqual(expected, battle.Validate(word));
         }
 
         [Test]

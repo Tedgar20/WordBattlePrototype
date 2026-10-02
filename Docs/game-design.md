@@ -61,12 +61,12 @@ Ask the user before building anything that depends on one of these. Each lists a
 | # | Question | Recommended default |
 |---|---|---|
 | Q1 | Must the word use only rack letters, each at most as often as it appears? | Yes, Scrabble-style multiset check |
-| Q2 | Does an invalid word, or no submission, score 0 or lose automatically? | ✅ **Implemented default: it scores 0, and a 0–0 tie goes to the defender** (D17). The user can still override this |
+| Q2 | Does an invalid word, or no submission, score 0 or lose automatically? | ✅ **Decided: invalid words can't be submitted at all** (the player isn't locked in). No submission scores 0, and 0–0 goes to the defender (D17) |
 | Q3 | Tie-break rule? | ✅ **Decided: fastest submission wins.** If neither player submitted, **the defender wins**, since the attacker chose to fight. In the MVP the AI is the defender |
 | Q4 | Is there a bonus for using all 8 tiles (anagram)? | ✅ **Decided: no bonus.** Gold is only a visual highlight |
 | Q5 | Minimum word length? | 2, matching the dictionary |
 | Q6 | Should validation as you type reveal whether a word is valid, since that helps the player? | Yes in the MVP; could become a difficulty option |
-| Q7 | How good is the MVP AI? | A difficulty knob picks from the valid words it can make, by percentile of score, with a simulated "think time" before submitting |
+| Q7 | How good is the MVP AI? | ✅ **Implemented:** opponent "Pip" (Skill 0.4 ± 0.15, 8–22s think time), tunable on `BattleManager` in the Inspector (D19) |
 | Q8 | Is the opponent's word shown before the reveal? | No; only a "locked in" indicator |
 | Q9 | Where do definitions for the JSON dictionary come from? | ✅ **Decided: the user will supply a definitions dictionary, committed to the repo.** JSON work waits for that file |
 | Q10 | Which dictionary is the source? What is its licence? | ✅ **Decided: ENABLE1 (from GitHub).** ENABLE is public domain. Keep a note of the source URL in the repo |

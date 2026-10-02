@@ -87,11 +87,16 @@ namespace WordBattle.Core
                 DefenderWins++;
             }
 
-            RoundEnded?.Invoke(result);
-
+            // Decide the match before notifying, so RoundEnded listeners already see IsOver for the final round.
             if (AttackerWins >= config.RoundsToWin || DefenderWins >= config.RoundsToWin)
             {
                 Winner = AttackerWins >= config.RoundsToWin ? BattleRole.Attacker : BattleRole.Defender;
+            }
+
+            RoundEnded?.Invoke(result);
+
+            if (Winner.HasValue)
+            {
                 MatchEnded?.Invoke(Winner.Value);
             }
         }

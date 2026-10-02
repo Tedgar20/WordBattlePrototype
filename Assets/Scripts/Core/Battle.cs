@@ -44,21 +44,36 @@ namespace WordBattle.Core
             return GetSubmission(role) != null;
         }
 
-        /// <summary>
-        /// Locks in a word for the given player. Returns false if that player already submitted
-        /// or the battle is over. Any word is accepted; words that aren't valid from the rack score 0.
-        /// </summary>
-        public bool Submit(BattleRole role, string word)
+        /// <summary>Validates a word against this battle's rack and dictionary, e.g. for as-you-type feedback.</summary>
+        public WordStatus Validate(string word)
         {
-            if (IsResolved || HasSubmitted(role))
+            return WordValidator.Validate(word, Rack, dictionary);
+        }
+
+        /// <summary>
+        /// Locks in a word for the given player. Only valid words from the rack are accepted;
+        /// an invalid word is rejected without locking the player in, so they can keep trying.
+        /// </summary>
+        public SubmitResult Submit(BattleRole role, string word)
+        {
+            if (IsResolved)
             {
-                return false;
+                return SubmitResult.BattleOver;
+            }
+
+            if (HasSubmitted(role))
+            {
+                return SubmitResult.AlreadySubmitted;
             }
 
             string normalized = WordDictionary.Normalize(word);
-            WordStatus status = WordValidator.Validate(normalized, Rack, dictionary);
-            int score = WordValidator.IsScoring(status) ? WordScorer.CalculateScore(normalized) : 0;
-            var submission = new Submission(role, normalized, status, score, Elapsed);
+            WordStatus status = Validate(normalized);
+            if (!WordValidator.IsScoring(status))
+            {
+                return SubmitResult.InvalidWord;
+            }
+
+            var submission = new Submission(role, normalized, status, WordScorer.CalculateScore(normalized), Elapsed);
 
             if (role == BattleRole.Attacker)
             {
@@ -76,7 +91,7 @@ namespace WordBattle.Core
                 Resolve();
             }
 
-            return true;
+            return SubmitResult.Accepted;
         }
 
         public void Tick(float deltaTime)
@@ -114,7 +129,7 @@ namespace WordBattle.Core
             }
             else if (attackerScore > 0 && attackerSubmission.SubmitTime != defenderSubmission.SubmitTime)
             {
-                // Equal non-zero scores mean both locked in valid words: fastest submission wins.
+                // Equal non-zero scores mean both locked in words: fastest submission wins.
                 winner = attackerSubmission.SubmitTime < defenderSubmission.SubmitTime
                     ? BattleRole.Attacker
                     : BattleRole.Defender;
@@ -122,7 +137,7 @@ namespace WordBattle.Core
             }
             else
             {
-                // Nobody scored, or an exact tie: the attacker chose the fight, so the defender holds.
+                // Nobody submitted, or an exact tie: the attacker chose the fight, so the defender holds.
                 winner = BattleRole.Defender;
                 reason = WinReason.DefenderByDefault;
             }

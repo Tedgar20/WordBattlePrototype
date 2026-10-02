@@ -8,7 +8,7 @@ namespace WordBattle.Core
         /// <summary>Scores tied above zero; the winner locked in first.</summary>
         FasterSubmission,
 
-        /// <summary>Neither player scored (no valid words), or both locked in at the same instant.</summary>
+        /// <summary>Neither player locked in a word, or both locked in equal scores at the same instant.</summary>
         DefenderByDefault
     }
 }

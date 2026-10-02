@@ -1,0 +1,22 @@
+{
+    "name": "WordBattle.Editor",
+    "rootNamespace": "WordBattle.Editor",
+    "references": [
+        "WordBattle.Core",
+        "WordBattle.Game",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
