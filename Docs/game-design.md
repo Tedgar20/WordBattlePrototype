@@ -54,6 +54,34 @@ The goal is a small, playable demo of the **word battle** alone, with no territo
 - **Battle format:** production battles are **best-of-1**, while the MVP uses best-of-3. The battle system must support both through configuration.
 - **Platforms:** Windows, macOS, Linux, iOS, Android, Xbox, PlayStation, and Switch, with **cross-platform online multiplayer**. Keep logic deterministic and separate from UI and platform code.
 
+## Maps and visual direction (full game)
+
+**Maps: board-game style, entirely fictional.**
+- Each map is a Risk-like board:
+  - **territories** grouped into **regions** (continents)
+  - a **region bonus** (extra troops) for holding a whole region
+  - **adjacency** between neighbouring territories, including **sea routes** drawn as dashed lines between landmasses
+- There will be **several maps**. They may differ in size, number of regions, and choke points, e.g. smaller maps for 2 players and larger ones for 4.
+- **No map may represent the real world.** That rules out:
+  - real continent or country silhouettes
+  - real place names
+  - recognisable real-world layouts
+- Invent original lands, names, and themes (e.g. a sunken archipelago, a floating-island realm). This also keeps the game distinct from Risk and Quarrel.
+- **Maps are data, not code.** A map asset defines:
+  - its territories (id, name, region, board position/shape reference)
+  - its regions (name, bonus)
+  - the adjacency graph
+  - starting troop rules
+
+  Gameplay code only sees the graph. Visuals are a separate layer, so new maps can be added without code changes and tested in EditMode (e.g. "every territory is reachable").
+
+**Visuals: semi-3D (2.5D).**
+- The strategy board is shown in light 3D: a board viewed at an angle, with territories as raised or extruded low-poly regions, 3D troop tokens, and camera pan and zoom.
+- The **word battle stays a 2D UI overlay**, as in the MVP.
+- Art style is undecided; stylised and low-poly suits the scope.
+- **Technical implication:** the project uses URP's **2D Renderer**, which doesn't light 3D meshes with 3D lights. Before board work starts, we'll add a Universal (3D) renderer for the board camera, or switch to it, while keeping the 2D UI. Decide this when the map feature starts.
+- **Help available from Claude:** I can build the map data model, adjacency logic, camera controls, procedural meshes from territory outlines, materials, and placeholder art. Hand-crafted 3D models, textures, and illustrated maps need an artist, asset-store packs, or a separate generation tool. I can integrate and wire them up.
+
 ## Open questions
 
 Ask the user before building anything that depends on one of these. Each lists a recommended default.
@@ -70,3 +98,5 @@ Ask the user before building anything that depends on one of these. Each lists a
 | Q8 | Is the opponent's word shown before the reveal? | No; only a "locked in" indicator |
 | Q9 | Where do definitions for the JSON dictionary come from? | ✅ **Decided: the user will supply a definitions dictionary, committed to the repo.** JSON work waits for that file |
 | Q10 | Which dictionary is the source? What is its licence? | ✅ **Decided: ENABLE1 (from GitHub).** ENABLE is public domain. Keep a note of the source URL in the repo |
+| Q11 | How are maps made: hand-authored, procedurally generated, or both? | Hand-authored first (2–3 maps), using a simple map-data format; consider procedural later |
+| Q12 | What are the rules and numbers for region bonuses, troop reinforcement, and capturing troops? | Spec with the `game-designer` agent when the map feature starts |

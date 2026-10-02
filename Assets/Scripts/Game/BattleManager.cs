@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using WordBattle.Core;
 
@@ -11,7 +12,9 @@ namespace WordBattle.Game
     public class BattleManager : MonoBehaviour
     {
         [SerializeField] private MatchConfig matchConfig = new MatchConfig();
-        [SerializeField] private AiProfile opponentProfile = new AiProfile();
+        [Tooltip("Computer opponents, easiest first. The player picks one on the setup screen.")]
+        [SerializeField] private AiProfile[] opponents = AiRoster.CreateDefault();
+        [SerializeField] private int selectedOpponent;
 
         [Tooltip("0 = different racks every match. Any other value replays the same racks and AI choices.")]
         [SerializeField] private int randomSeed;
@@ -24,7 +27,9 @@ namespace WordBattle.Game
 
         public Match Match => match;
         public HumanPlayerController Human { get; private set; }
-        public AiProfile OpponentProfile => opponentProfile;
+        public IReadOnlyList<AiProfile> Opponents => opponents;
+        public int SelectedOpponentIndex => selectedOpponent;
+        public AiProfile OpponentProfile => opponents[selectedOpponent];
         public BattleRole HumanRole => humanRole;
         public BattleRole OpponentRole => humanRole == BattleRole.Attacker ? BattleRole.Defender : BattleRole.Attacker;
         public Battle CurrentBattle => match?.CurrentBattle;
@@ -36,8 +41,27 @@ namespace WordBattle.Game
         /// <summary>Raised when the player continues past the final round's results.</summary>
         public event Action<BattleRole> MatchFinished;
 
+        public void SelectOpponent(int index)
+        {
+            if (index < 0 || index >= opponents.Length)
+            {
+                Debug.LogError($"BattleManager: no opponent at index {index}.", this);
+                return;
+            }
+
+            selectedOpponent = index;
+        }
+
         public bool StartMatch()
         {
+            if (opponents == null || opponents.Length == 0)
+            {
+                Debug.LogError("BattleManager: no opponents configured.", this);
+                return false;
+            }
+
+            selectedOpponent = Mathf.Clamp(selectedOpponent, 0, opponents.Length - 1);
+
             WordDictionary dictionary = DictionaryManager.Instance != null ? DictionaryManager.Instance.Dictionary : null;
             if (dictionary == null)
             {
@@ -52,7 +76,7 @@ namespace WordBattle.Game
             match.RoundEnded += OnRoundEnded;
 
             Human = new HumanPlayerController(humanRole);
-            opponent = new AiPlayerController(OpponentRole, opponentProfile, dictionary, random);
+            opponent = new AiPlayerController(OpponentRole, OpponentProfile, dictionary, random);
 
             StartNextRound();
             return true;

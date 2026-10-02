@@ -12,6 +12,7 @@ namespace WordBattle.Game
 
         [Header("Screens")]
         [SerializeField] private GameObject mainMenuScreen;
+        [SerializeField] private GameObject setupScreen;
         [SerializeField] private GameObject gameplayScreen;
         [SerializeField] private GameObject victoryScreen;
 
@@ -21,7 +22,8 @@ namespace WordBattle.Game
 
         private void Awake()
         {
-            if (battleManager == null || mainMenuScreen == null || gameplayScreen == null || victoryScreen == null)
+            if (battleManager == null || mainMenuScreen == null || setupScreen == null || gameplayScreen == null ||
+                victoryScreen == null)
             {
                 Debug.LogError("GameModeManager: a reference is not assigned in the Inspector.", this);
                 enabled = false;
@@ -49,24 +51,28 @@ namespace WordBattle.Game
             SetMode(GameMode.MainMenu);
         }
 
+        /// <summary>From the main menu: go to the setup screen to pick an opponent.</summary>
         public void StartGame()
         {
-            // MVP has no setup options yet (opponent choice comes later), so setup is instant.
             SetMode(GameMode.GameSetup);
-
-            if (battleManager.StartMatch())
-            {
-                SetMode(GameMode.Gameplay);
-            }
-            else
-            {
-                SetMode(GameMode.MainMenu);
-            }
         }
 
+        /// <summary>From the setup screen: fight the chosen opponent.</summary>
+        public void StartMatch(int opponentIndex)
+        {
+            battleManager.SelectOpponent(opponentIndex);
+            BeginMatch();
+        }
+
+        /// <summary>From the victory screen: rematch the same opponent.</summary>
         public void PlayAgain()
         {
-            StartGame();
+            BeginMatch();
+        }
+
+        private void BeginMatch()
+        {
+            SetMode(battleManager.StartMatch() ? GameMode.Gameplay : GameMode.MainMenu);
         }
 
         public void ReturnToMainMenu()
@@ -85,6 +91,7 @@ namespace WordBattle.Game
             Mode = mode;
 
             mainMenuScreen.SetActive(mode == GameMode.MainMenu);
+            setupScreen.SetActive(mode == GameMode.GameSetup);
             gameplayScreen.SetActive(mode == GameMode.Gameplay);
             victoryScreen.SetActive(mode == GameMode.Victory);
 

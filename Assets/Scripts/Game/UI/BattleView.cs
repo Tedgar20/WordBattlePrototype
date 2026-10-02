@@ -20,9 +20,11 @@ namespace WordBattle.Game.UI
         [SerializeField] private TMP_Text timerText;
 
         [Header("Rack")]
-        [SerializeField] private GameObject[] tiles;
+        [SerializeField] private Button[] tiles;
         [SerializeField] private TMP_Text[] tileLetters;
         [SerializeField] private TMP_Text[] tileScores;
+        [SerializeField] private Button shuffleButton;
+        [SerializeField] private Button clearButton;
 
         [Header("Input")]
         [SerializeField] private TMP_InputField wordInput;
@@ -47,15 +49,23 @@ namespace WordBattle.Game.UI
         [SerializeField] private Color invalidColor = new Color(0.90f, 0.35f, 0.35f);
         [SerializeField] private Color anagramColor = new Color(0.95f, 0.75f, 0.20f);
         [SerializeField] private Color warningTimeColor = new Color(0.90f, 0.35f, 0.35f);
+        [SerializeField] private Color tileFaceColor = new Color(0.95f, 0.90f, 0.79f);
+        [SerializeField] private Color tileUsedColor = new Color(0.45f, 0.43f, 0.40f);
 
         private const float WarningSeconds = 5f;
 
         private bool hasLockedIn;
+        private Rack rack;
+
+        // Display slot → index into rack.Tiles. Shuffling only reorders the display, never the rack itself.
+        private int[] displayOrder = new int[0];
+        private bool[] slotUsed = new bool[0];
+        private readonly System.Random shuffleRandom = new System.Random();
 
         private void Awake()
         {
             if (battleManager == null || wordInput == null || submitButton == null || resultsPanel == null ||
-                tiles == null || tileLetters == null || tileScores == null)
+                tiles == null || tileLetters == null || tileScores == null || shuffleButton == null || clearButton == null)
             {
                 Debug.LogError("BattleView: a reference is not assigned in the Inspector.", this);
                 enabled = false;
@@ -63,6 +73,9 @@ namespace WordBattle.Game.UI
             }
 
             wordInput.onValidateInput = (text, index, c) => char.IsLetter(c) ? char.ToUpperInvariant(c) : '\0';
+
+            // Keep the typed word when focus returns after clicking a tile.
+            wordInput.onFocusSelectAll = false;
         }
 
         private void OnEnable()
@@ -74,6 +87,13 @@ namespace WordBattle.Game.UI
             wordInput.onSubmit.AddListener(OnWordSubmitted);
             submitButton.onClick.AddListener(OnSubmitClicked);
             continueButton.onClick.AddListener(OnContinueClicked);
+            shuffleButton.onClick.AddListener(OnShuffleClicked);
+            clearButton.onClick.AddListener(OnClearClicked);
+            for (int i = 0; i < tiles.Length; i++)
+            {
+                int slot = i;
+                tiles[i].onClick.AddListener(() => OnTileClicked(slot));
+            }
 
             // The first round may have started before this screen was shown.
             Battle battle = battleManager.CurrentBattle;
@@ -96,6 +116,12 @@ namespace WordBattle.Game.UI
             wordInput.onSubmit.RemoveListener(OnWordSubmitted);
             submitButton.onClick.RemoveListener(OnSubmitClicked);
             continueButton.onClick.RemoveListener(OnContinueClicked);
+            shuffleButton.onClick.RemoveListener(OnShuffleClicked);
+            clearButton.onClick.RemoveListener(OnClearClicked);
+            foreach (Button tile in tiles)
+            {
+                tile.onClick.RemoveAllListeners();
+            }
         }
 
         private void Update()
@@ -123,10 +149,13 @@ namespace WordBattle.Game.UI
             matchScoreText.text =
                 $"You {match.GetWins(battleManager.HumanRole)} – {match.GetWins(battleManager.OpponentRole)} {OpponentName}";
 
-            ShowRack(battle.Rack);
+            rack = battle.Rack;
+            ResetDisplayOrder();
+            ShowRack();
 
             wordInput.characterLimit = battle.Rack.Size;
             wordInput.interactable = true;
+            SetRackInteractable(true);
             wordInput.text = string.Empty;
             wordInput.ActivateInputField();
 
@@ -147,6 +176,7 @@ namespace WordBattle.Game.UI
         {
             wordInput.interactable = false;
             submitButton.interactable = false;
+            SetRackInteractable(false);
 
             bool humanWon = result.Winner == battleManager.HumanRole;
             resultsTitleText.text = humanWon ? "You win the round!" : $"{OpponentName} wins the round";
@@ -198,6 +228,7 @@ namespace WordBattle.Game.UI
 
             wordInput.textComponent.color = status == WordStatus.Empty ? neutralColor : feedbackText.color;
             submitButton.interactable = WordValidator.IsScoring(status);
+            MarkUsedTiles(word);
         }
 
         private void OnWordSubmitted(string word)
@@ -223,6 +254,7 @@ namespace WordBattle.Game.UI
                 hasLockedIn = true;
                 wordInput.interactable = false;
                 submitButton.interactable = false;
+                SetRackInteractable(false);
                 playerStatusText.text = $"You locked in {WordDictionary.Normalize(word)}";
                 SetFeedback("Waiting for the reveal…", neutralColor);
             }
@@ -242,7 +274,64 @@ namespace WordBattle.Game.UI
 
         private string OpponentName => battleManager.OpponentProfile.Name;
 
-        private void ShowRack(Rack rack)
+        private void OnTileClicked(int slot)
+        {
+            if (hasLockedIn || rack == null || slot >= displayOrder.Length || slotUsed[slot])
+            {
+                return;
+            }
+
+            // Setting text fires onValueChanged, which re-validates and re-marks used tiles.
+            wordInput.text += rack.Tiles[displayOrder[slot]];
+            FocusInput();
+        }
+
+        private void OnShuffleClicked()
+        {
+            for (int i = displayOrder.Length - 1; i > 0; i--)
+            {
+                int j = shuffleRandom.Next(i + 1);
+                (displayOrder[i], displayOrder[j]) = (displayOrder[j], displayOrder[i]);
+            }
+
+            ShowRack();
+            MarkUsedTiles(wordInput.text);
+            FocusInput();
+        }
+
+        private void OnClearClicked()
+        {
+            if (hasLockedIn)
+            {
+                return;
+            }
+
+            wordInput.text = string.Empty;
+            FocusInput();
+        }
+
+        private void FocusInput()
+        {
+            if (hasLockedIn)
+            {
+                return;
+            }
+
+            wordInput.ActivateInputField();
+            wordInput.caretPosition = wordInput.text.Length;
+        }
+
+        private void ResetDisplayOrder()
+        {
+            displayOrder = new int[rack.Size];
+            slotUsed = new bool[rack.Size];
+            for (int i = 0; i < displayOrder.Length; i++)
+            {
+                displayOrder[i] = i;
+            }
+        }
+
+        private void ShowRack()
         {
             if (rack.Size > tiles.Length)
             {
@@ -252,14 +341,52 @@ namespace WordBattle.Game.UI
             for (int i = 0; i < tiles.Length; i++)
             {
                 bool used = i < rack.Size;
-                tiles[i].SetActive(used);
+                tiles[i].gameObject.SetActive(used);
                 if (used)
                 {
-                    char letter = rack.Tiles[i];
+                    char letter = rack.Tiles[displayOrder[i]];
                     tileLetters[i].text = letter.ToString();
                     tileScores[i].text = LetterScoreTable.GetLetterScore(letter).ToString();
                 }
             }
+        }
+
+        /// <summary>Dims the tiles the current word uses, left to right in display order.</summary>
+        private void MarkUsedTiles(string word)
+        {
+            if (rack == null)
+            {
+                return;
+            }
+
+            System.Array.Clear(slotUsed, 0, slotUsed.Length);
+            foreach (char c in WordDictionary.Normalize(word))
+            {
+                for (int slot = 0; slot < displayOrder.Length; slot++)
+                {
+                    if (!slotUsed[slot] && rack.Tiles[displayOrder[slot]] == c)
+                    {
+                        slotUsed[slot] = true;
+                        break;
+                    }
+                }
+            }
+
+            for (int slot = 0; slot < displayOrder.Length && slot < tiles.Length; slot++)
+            {
+                tiles[slot].image.color = slotUsed[slot] ? tileUsedColor : tileFaceColor;
+            }
+        }
+
+        private void SetRackInteractable(bool interactable)
+        {
+            foreach (Button tile in tiles)
+            {
+                tile.interactable = interactable;
+            }
+
+            shuffleButton.interactable = interactable;
+            clearButton.interactable = interactable;
         }
 
         private void SetFeedback(string message, Color color)

@@ -54,7 +54,8 @@ The MVP loop is **playable end to end**: Main Menu → 3-round match against the
 | `WordBattle.Core` | `Assets/Scripts/Core/` | Pure C# rules, namespace `WordBattle.Core`. `noEngineReferences: true`, so the compiler **forbids** `UnityEngine` here. |
 | `WordBattle.Game` | `Assets/Scripts/Game/` (+ `UI/`) | MonoBehaviour adapters and views, namespaces `WordBattle.Game` and `WordBattle.Game.UI`. |
 | `WordBattle.Editor` | `Assets/Editor/` | Editor-only tooling: `BattleSceneBuilder`. |
-| `WordBattle.Tests.EditMode` | `Assets/Tests/EditMode/` | NUnit EditMode tests for Core, using a small in-memory word list (`TestWords`). |
+| `WordBattle.Tests.EditMode` | `Assets/Tests/EditMode/` | NUnit EditMode tests for Core, using a small in-memory word list (`TestWords`). Also holds `TestResultsWriter`, which writes every run's summary to `Temp/TestResults.txt`. |
+| `WordBattle.Tests.PlayMode` | `Assets/Tests/PlayMode/` | `GameFlowTests`: load the real scene and click through Menu → Setup → 3 rounds → Victory → Play Again → Menu, plus tiles, Clear, Shuffle, and Lock In enabling. They fast-forward `Battle.Tick`. |
 
 **Core (tested):**
 
@@ -68,19 +69,21 @@ The MVP loop is **playable end to end**: Main Menu → 3-round match against the
 | `Battle` | Shared rack and timer, driven by `Tick(dt)`.<br>`Submit(role, word)` returns a `SubmitResult`. **Invalid words are rejected without locking in.**<br>Each role locks in once.<br>`Submitted` carries only the role, so the word stays hidden. `Resolved` fires once.<br>Resolves when both players have submitted or time expires. |
 | `BattleResult`, `Submission`, `BattleRole`, `WinReason`, `SubmitResult` | Result data. |
 | `Match`, `MatchConfig` | Best-of-N (`RoundsToWin`). `Winner` is set *before* `RoundEnded` fires. |
+| `AiRoster`, `AiDifficulty` | The built-in opponents, easiest first: **Pip** (Easy), **Marlow** (Medium), **Odessa** (Hard), **Vex** (Expert). Tests enforce that the names are unique, that none reuses an original Quarrel name, and that difficulty rises in order. |
 | `IPlayerController` | The multiplayer seam. Implemented by:<br>• `HumanPlayerController`: words come from the UI.<br>• `AiPlayerController`: solves the rack and picks a word by skill percentile from an `AiProfile` (Name, Skill, SkillVariance, think-time range), then submits after its think time. |
 
 **Game (Unity layer):**
 
 | Type | Role |
 |---|---|
-| `DictionaryManager` | Singleton that loads the TextAsset into a `WordDictionary`. |
-| `BattleManager` | Owns a `Match` and both controllers.<br>Ticks the match from `Update`.<br>Re-raises `RoundStarted`, `PlayerLockedIn`, and `RoundEnded`.<br>`Continue()` starts the next round, or raises `MatchFinished` after the final results. |
-| `GameModeManager`, `GameMode` | Toggles the MainMenu, Gameplay, and Victory screens. GameSetup is instant in the MVP. |
-| `UI/MainMenuView`, `UI/BattleView`, `UI/VictoryView` | Views that render state on `OnEnable` and react to events. They contain no rules. |
+| `DictionaryManager` | Singleton that loads the TextAsset into a `WordDictionary`. It persists across scenes, so it must be alone on a root GameObject. A duplicate destroys only its own component. |
+| `BattleManager` | Holds the opponent roster (`opponents`, editable in the Inspector) and `SelectOpponent(i)`.<br>Owns a `Match` and both controllers.<br>Ticks the match from `Update`.<br>Re-raises `RoundStarted`, `PlayerLockedIn`, and `RoundEnded`.<br>`Continue()` starts the next round, or raises `MatchFinished` after the final results. |
+| `GameModeManager`, `GameMode` | Toggles the MainMenu, GameSetup (opponent picker), Gameplay, and Victory screens.<br>`StartGame` opens setup, `StartMatch(i)` fights opponent *i*, `PlayAgain` rematches the same opponent. |
+| `UI/MainMenuView`, `UI/SetupView`, `UI/BattleView`, `UI/VictoryView` | Views that render state on `OnEnable` and react to events. They contain no rules.<br>`BattleView` also handles:<br>• clickable tiles, which append a letter; used tiles are dimmed<br>• **Shuffle**, which reorders the display only, never the `Rack`<br>• **Clear** |
 
 **Scene:** `Assets/Scenes/WordBattle.unity` is **generated** by *Word Battle → Rebuild Battle Scene* (`BattleSceneBuilder`). It contains:
-- `[Systems]`: the managers.
+- `[Systems]`: `BattleManager` and `GameModeManager`.
+- `[Dictionary]`: `DictionaryManager`, alone on its own root because `DontDestroyOnLoad` persists the whole GameObject. Sharing it with other managers made them leak across scene reloads; the PlayMode tests caught this.
 - `[UI] Canvas`: 1920×1080 reference resolution, Scale With Screen Size.
 - `EventSystem`: uses `InputSystemUIInputModule`.
 
@@ -94,11 +97,9 @@ To change the layout, edit the builder and re-run it, rather than hand-editing t
 4. **The rack UI has a fixed 8 tiles,** built by the scene builder. `BattleView` logs an error if `RackSize` is larger.
 5. **Default font:** TMP's Liberation Sans lacks symbols like ✓ ★ ✗, so UI copy uses plain text. Add a font with those glyphs if icons are wanted.
 6. **Pre-release package:** `com.unity.ai.assistant` is pre-release (`2.20.0-pre.1`). It's an editor tool only.
-7. **Editor testing caveat:** an unfocused Unity Editor doesn't advance Play mode frames. MCP-driven play tests advance `Battle.Tick` manually; real-time feel must be checked by a person.
+7. **Editor testing caveat:** an unfocused Unity Editor doesn't advance Play mode frames, and may not process MCP commands at all. MCP-driven play tests advance `Battle.Tick` manually; real-time feel must be checked by a person.
 
 ## Still to build
 
-- Clickable tiles, shuffle button, sounds, and animations: polish.
-- Opponent selection and difficulty at GameSetup, with original named AI characters.
-- PlayMode tests for UI flow.
+- Polish: a Space-key shuffle shortcut, sounds, reveal animations, and opponent portraits (move the roster to ScriptableObjects when portraits arrive).
 - Full game: territory, `PlayerTurnManager` and the turn timer, and 2–4 players.

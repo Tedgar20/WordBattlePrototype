@@ -19,11 +19,18 @@ namespace WordBattle.Game
         {
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject);
+                // Only remove this duplicate component; never take down other systems sharing the GameObject.
+                Destroy(this);
                 return;
             }
 
             Instance = this;
+
+            // DontDestroyOnLoad moves the whole GameObject, so it must live on its own root object.
+            if (transform.parent != null || GetComponents<Component>().Length > 2)
+            {
+                Debug.LogWarning("DictionaryManager should be alone on a root GameObject; it will persist across scene loads.", this);
+            }
             DontDestroyOnLoad(gameObject);
 
             LoadDictionary();

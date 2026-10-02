@@ -43,7 +43,9 @@ The user is an experienced programmer who is **new to game development and Unity
 - **UI:** UGUI + TextMeshPro. **Input:** the new Input System package (`com.unity.inputsystem`) is installed.
 - **Tests:** Unity Test Framework 1.6.0, EditMode tests in `Assets/Tests/EditMode`.
   - To run them in the Editor: *Window → General → Test Runner → EditMode → Run All*.
-  - To run them through the MCP: call `Unity_RunCommand` with `TestRunnerApi.Execute(... runSynchronously = true)` and write the results to `Temp/`.
+  - PlayMode tests live in `Assets/Tests/PlayMode` (*Test Runner → PlayMode → Run All*).
+  - To run them through the MCP: call `Unity_RunCommand` with `TestRunnerApi.Execute(...)`. Use `runSynchronously = true` for EditMode only.
+  - Then read `Temp/TestResults.txt`, which `TestResultsWriter` writes after every run, including PlayMode.
 - **Scene:** `Assets/Scenes/WordBattle.unity` is **generated** by *Word Battle → Rebuild Battle Scene* (`Assets/Editor/BattleSceneBuilder.cs`).
   - Change the UI by editing the builder and re-running it.
   - Through the MCP, call `WordBattle.Editor.BattleSceneBuilder.Build()`.
@@ -59,6 +61,11 @@ The user is an experienced programmer who is **new to game development and Unity
   - `Unity_SceneView_*` / `Unity_Camera_Capture` take screenshots.
   - The `NoSubscription` info logs come from the Unity AI package and are harmless.
   - An unfocused Editor doesn't advance Play mode frames, so drive `Battle.Tick` manually in MCP play tests.
+  - If MCP calls hang, Unity may be unfocused, or the relay may have dropped. Ask the user to focus Unity or run `/mcp` to reconnect.
+  - Check `EditorApplication.isPlaying` before editing the scene. The builder refuses to run in Play mode.
+  - **Modal dialogs block every MCP call.** If a call hangs while Unity is idle, ask the user to look for a popup in Unity.
+  - A `RunCommand` that creates objects, such as `BattleSceneBuilder.Build()`, leaves the scene marked modified even after it saves. The Test Runner then shows a "save scenes?" prompt that blocks the MCP. Always save the scene in a **separate** `RunCommand` (`EditorSceneManager.SaveScene`) before starting tests.
+  - PlayMode test runs are asynchronous: start them, then poll `Temp/TestResults.txt` for a newer timestamp.
   - The Unity AI assistant blocks `File.Delete` in `RunCommand`.
   - The relay can drop after inactivity. If calls hang, ask the user to reconnect with `/mcp`.
 

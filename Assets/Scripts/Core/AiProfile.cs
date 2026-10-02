@@ -7,6 +7,10 @@ namespace WordBattle.Core
     public sealed class AiProfile
     {
         public string Name = "Pip";
+        public AiDifficulty Difficulty = AiDifficulty.Easy;
+
+        /// <summary>One-line personality shown when choosing an opponent.</summary>
+        public string Tagline = "";
 
         /// <summary>0 = picks among its weakest words, 1 = always finds the best word.</summary>
         public float Skill = 0.4f;

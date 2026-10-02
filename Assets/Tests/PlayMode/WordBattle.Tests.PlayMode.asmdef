@@ -1,0 +1,25 @@
+{
+    "name": "WordBattle.Tests.PlayMode",
+    "rootNamespace": "WordBattle.Tests.PlayMode",
+    "references": [
+        "WordBattle.Core",
+        "WordBattle.Game",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

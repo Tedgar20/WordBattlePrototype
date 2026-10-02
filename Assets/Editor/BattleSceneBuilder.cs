@@ -20,6 +20,7 @@ namespace WordBattle.Editor
         private const string ScenePath = "Assets/Scenes/WordBattle.unity";
         private const string DictionaryPath = "Assets/Data/WordBattleDictionary.txt";
         private const string SystemsName = "[Systems]";
+        private const string DictionaryName = "[Dictionary]";
         private const string CanvasName = "[UI] Canvas";
         private const string EventSystemName = "EventSystem";
         private const int TileCount = 8;
@@ -42,7 +43,7 @@ namespace WordBattle.Editor
         {
             bool confirmed = EditorUtility.DisplayDialog(
                 "Rebuild Battle Scene",
-                $"This replaces {SystemsName}, {CanvasName} and {EventSystemName} in {ScenePath}. Manual edits to those objects will be lost.",
+                $"This replaces {SystemsName}, {DictionaryName}, {CanvasName} and {EventSystemName} in {ScenePath}. Manual edits to those objects will be lost.",
                 "Rebuild",
                 "Cancel");
 
@@ -54,6 +55,12 @@ namespace WordBattle.Editor
 
         public static void Build()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                Debug.LogError("BattleSceneBuilder: exit Play mode before rebuilding the scene.");
+                return;
+            }
+
             Scene scene = SceneManager.GetActiveScene();
             if (scene.path != ScenePath)
             {
@@ -64,7 +71,7 @@ namespace WordBattle.Editor
                 scene = EditorSceneManager.OpenScene(ScenePath);
             }
 
-            foreach (string name in new[] { SystemsName, CanvasName, EventSystemName })
+            foreach (string name in new[] { SystemsName, DictionaryName, CanvasName, EventSystemName })
             {
                 foreach (GameObject root in scene.GetRootGameObjects())
                 {
@@ -96,8 +103,12 @@ namespace WordBattle.Editor
             // --- Systems ---
             var systems = new GameObject(SystemsName);
             Undo.RegisterCreatedObjectUndo(systems, "Create systems");
-            var dictionaryManager = systems.AddComponent<DictionaryManager>();
             var battleManager = systems.AddComponent<BattleManager>();
+
+            // Separate root: DictionaryManager persists across scene loads via DontDestroyOnLoad.
+            var dictionaryObject = new GameObject(DictionaryName);
+            Undo.RegisterCreatedObjectUndo(dictionaryObject, "Create dictionary");
+            var dictionaryManager = dictionaryObject.AddComponent<DictionaryManager>();
             var gameModeManager = systems.AddComponent<GameModeManager>();
             SetRef(dictionaryManager, "dictionaryFile", AssetDatabase.LoadAssetAtPath<TextAsset>(DictionaryPath));
 
@@ -116,16 +127,24 @@ namespace WordBattle.Editor
             Stretch(background.rectTransform);
 
             GameObject mainMenu = BuildMainMenu(canvas, gameModeManager);
+            GameObject setup = BuildSetup(canvas, gameModeManager, battleManager);
             GameObject gameplay = BuildGameplay(canvas, battleManager);
             GameObject victory = BuildVictory(canvas, gameModeManager, battleManager);
 
             SetRef(gameModeManager, "battleManager", battleManager);
             SetRef(gameModeManager, "mainMenuScreen", mainMenu);
+            SetRef(gameModeManager, "setupScreen", setup);
             SetRef(gameModeManager, "gameplayScreen", gameplay);
             SetRef(gameModeManager, "victoryScreen", victory);
 
+            setup.SetActive(false);
             gameplay.SetActive(false);
             victory.SetActive(false);
+
+            // Settle layout groups before saving so the saved RectTransforms match what's displayed.
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)canvas);
+            Canvas.ForceUpdateCanvases();
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -142,11 +161,64 @@ namespace WordBattle.Editor
             CreateText(screen, "Tagline", "Same tiles. Thirty seconds. Best word wins.", 44, TextMuted, FontStyles.Normal, 70);
             CreateSpacer(screen, 40);
             RectTransform startRow = CreateRow(screen, "StartRow", 120, 0, TextAnchor.MiddleCenter);
-            Button start = CreateButton(startRow, "StartButton", "Start Game", ButtonPrimary, 480, 120, out _);
+            Button start = CreateButton(startRow, "StartButton", "Play", ButtonPrimary, 480, 120, out _);
 
             var view = screen.gameObject.AddComponent<MainMenuView>();
             SetRef(view, "gameModeManager", gameModeManager);
             SetRef(view, "startButton", start);
+            return screen.gameObject;
+        }
+
+        private static GameObject BuildSetup(Transform canvas, GameModeManager gameModeManager, BattleManager battleManager)
+        {
+            RectTransform screen = CreateScreen("SetupScreen", canvas, 40);
+
+            CreateText(screen, "Title", "Choose your opponent", 96, Gold, FontStyles.Bold, 130);
+            CreateSpacer(screen, 10);
+
+            int count = battleManager.Opponents.Count;
+            RectTransform cards = CreateRow(screen, "Opponents", 440, 36, TextAnchor.MiddleCenter);
+            var buttons = new Button[count];
+            var names = new TMP_Text[count];
+            var difficulties = new TMP_Text[count];
+            var taglines = new TMP_Text[count];
+            for (int i = 0; i < count; i++)
+            {
+                RectTransform card = CreateUIObject($"OpponentCard{i + 1}", cards);
+                Image cardImage = card.gameObject.AddComponent<Image>();
+                cardImage.color = InputBackground;
+                buttons[i] = card.gameObject.AddComponent<Button>();
+                buttons[i].targetGraphic = cardImage;
+
+                var cardLayout = card.gameObject.AddComponent<LayoutElement>();
+                cardLayout.preferredWidth = 380;
+                cardLayout.preferredHeight = 440;
+                cardLayout.flexibleWidth = 0; // the card's own column layout would otherwise stretch it
+
+                var column = card.gameObject.AddComponent<VerticalLayoutGroup>();
+                ConfigureColumn(column, 16, TextAnchor.UpperCenter);
+                column.padding = new RectOffset(28, 28, 40, 30);
+
+                names[i] = CreateText(card, "Name", "Name", 72, TextLight, FontStyles.Bold, 90);
+                difficulties[i] = CreateText(card, "Difficulty", "EASY", 36, Gold, FontStyles.Bold, 50);
+                CreateSpacer(card, 10);
+                taglines[i] = CreateText(card, "Tagline", "Tagline", 32, TextMuted, FontStyles.Italic, 180);
+                taglines[i].textWrappingMode = TextWrappingModes.Normal;
+                taglines[i].alignment = TextAlignmentOptions.Top;
+            }
+
+            CreateSpacer(screen, 20);
+            RectTransform backRow = CreateRow(screen, "BackRow", 100, 0, TextAnchor.MiddleCenter);
+            Button back = CreateButton(backRow, "BackButton", "Back", ButtonSecondary, 320, 100, out _);
+
+            var view = screen.gameObject.AddComponent<SetupView>();
+            SetRef(view, "gameModeManager", gameModeManager);
+            SetRef(view, "battleManager", battleManager);
+            SetArray(view, "opponentButtons", buttons);
+            SetArray(view, "opponentNames", names);
+            SetArray(view, "opponentDifficulties", difficulties);
+            SetArray(view, "opponentTaglines", taglines);
+            SetRef(view, "backButton", back);
             return screen.gameObject;
         }
 
@@ -168,13 +240,16 @@ namespace WordBattle.Editor
 
             // Rack
             RectTransform rack = CreateRow(screen, "Rack", 170, 22, TextAnchor.MiddleCenter);
-            var tiles = new GameObject[TileCount];
+            var tiles = new Button[TileCount];
             var letters = new TMP_Text[TileCount];
             var scores = new TMP_Text[TileCount];
             for (int i = 0; i < TileCount; i++)
             {
                 RectTransform tile = CreateUIObject($"Tile{i + 1}", rack);
-                tile.gameObject.AddComponent<Image>().color = TileFace;
+                Image face = tile.gameObject.AddComponent<Image>();
+                face.color = TileFace;
+                var tileButton = tile.gameObject.AddComponent<Button>();
+                tileButton.targetGraphic = face;
                 var layout = tile.gameObject.AddComponent<LayoutElement>();
                 layout.preferredWidth = 150;
                 layout.preferredHeight = 150;
@@ -186,7 +261,7 @@ namespace WordBattle.Editor
                 Stretch(scores[i].rectTransform);
                 scores[i].margin = new Vector4(0, 0, 12, 6);
 
-                tiles[i] = tile.gameObject;
+                tiles[i] = tileButton;
             }
 
             CreateSpacer(screen, 20);
@@ -198,7 +273,12 @@ namespace WordBattle.Editor
             TMP_Text feedback = CreateText(screen, "FeedbackText", "Type a word using the tiles above", 40, TextMuted, FontStyles.Normal, 60);
 
             RectTransform submitRow = CreateRow(screen, "SubmitRow", 110, 0, TextAnchor.MiddleCenter);
+            submitRow.GetComponent<HorizontalLayoutGroup>().spacing = 30;
+            Button shuffle = CreateButton(submitRow, "ShuffleButton", "Shuffle", ButtonSecondary, 260, 90, out TMP_Text shuffleLabel);
+            shuffleLabel.fontSize = 38;
             Button submit = CreateButton(submitRow, "SubmitButton", "Lock In", ButtonPrimary, 420, 110, out _);
+            Button clear = CreateButton(submitRow, "ClearButton", "Clear", ButtonSecondary, 260, 90, out TMP_Text clearLabel);
+            clearLabel.fontSize = 38;
 
             TMP_Text playerStatus = CreateText(screen, "PlayerStatusText", "Make the best word you can", 38, TextMuted, FontStyles.Italic, 60);
 
@@ -229,6 +309,8 @@ namespace WordBattle.Editor
             SetArray(view, "tiles", tiles);
             SetArray(view, "tileLetters", letters);
             SetArray(view, "tileScores", scores);
+            SetRef(view, "shuffleButton", shuffle);
+            SetRef(view, "clearButton", clear);
             SetRef(view, "wordInput", input);
             SetRef(view, "feedbackText", feedback);
             SetRef(view, "submitButton", submit);
