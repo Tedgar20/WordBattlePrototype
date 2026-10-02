@@ -77,7 +77,6 @@ enum TurnState  { StartTurn, AwaitAction, InBattle, EndingTurn }
 
 1. **The scene is empty.** `Assets/Scenes/WordBattle.unity` is still the untouched URP template (Main Camera + Global Light 2D).
    - The TMP UI and the `GameStateManager`/`DictionaryManager` objects described in earlier notes were **never saved**.
-   - `Assets/_Recovery/0.unity` is an untracked crash-recovery scene with nothing worth keeping. It now also references the deleted `DebugTest` script. The user should delete it.
    - The UI must be rebuilt, ideally against the new Battle architecture rather than the prototype.
 2. **The project uses the new Input System only** (`activeInputHandler: 1`).
    - Any EventSystem must use `InputSystemUIInputModule`, not `StandaloneInputModule`, which would throw errors.
